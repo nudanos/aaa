@@ -5,5 +5,14 @@ export GO111MODULE := off
 #export DH_VERBOSE=1
 export DH_GOPKG := github.com/danos/aaa
 
+GOBUILDDIR := _build
+
 %:
-	dh $@ --buildsystem=golang --with golang
+	dh $@ --buildsystem=golang --with golang --builddirectory=$(GOBUILDDIR)
+
+# NuDanOS: vet every Go package
+override_dh_auto_build: vet
+	dh_auto_build
+
+vet:
+	cd $(GOBUILDDIR)/src/$(DH_GOPKG) && GOPATH=$(CURDIR)/$(GOBUILDDIR) go vet ./...
