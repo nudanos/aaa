@@ -98,28 +98,36 @@ type AAA struct {
 	Protocols map[string]*AAAProtocol
 }
 
-func lookupPluginImpl(name string, p *plugin.Plugin, ver uint32) (AAAPlugin, error) {
+// symbolLookuper is the part of *plugin.Plugin that lookupPluginImpl uses
+type symbolLookuper interface {
+	Lookup(symName string) (plugin.Symbol, error)
+}
+
+func lookupPluginImpl(name string, p symbolLookuper, ver uint32) (AAAPlugin, error) {
 	symPluginVersion, err := p.Lookup(aaaPluginAPIVersionSym)
+	if err != nil {
+		return nil, fmt.Errorf("plugin %s: %w", name, err)
+	}
 	version, ok := symPluginVersion.(*uint32)
 	if !ok {
-		err := fmt.Errorf("Unexpected type from " + aaaPluginAPIVersionSym + " symbol")
+		err := fmt.Errorf("unexpected type from %s symbol", aaaPluginAPIVersionSym)
 		return nil, err
 	}
 	if *version != ver {
-		err := fmt.Errorf("Unsupported %s for plugin %s: %d, expected %d",
+		err := fmt.Errorf("unsupported %s for plugin %s: %d, expected %d",
 			aaaPluginAPIVersionSym, name, *version, ver)
 		return nil, err
 	}
 
 	symPlugin, err := p.Lookup(fmt.Sprintf(aaaPluginImplSymFmt, ver))
 	if err != nil {
-		err := fmt.Errorf("Could not lookup plugin V%d", ver)
+		err := fmt.Errorf("could not lookup plugin V%d: %w", ver, err)
 		return nil, err
 	}
 	var aaaPlugin AAAPlugin
 	aaaPlugin, ok = symPlugin.(AAAPlugin)
 	if !ok {
-		err := fmt.Errorf("Unexpected type from "+aaaPluginImplSymFmt+" symbol", ver)
+		err := fmt.Errorf("unexpected type from "+aaaPluginImplSymFmt+" symbol", ver)
 		return nil, err
 	}
 	return aaaPlugin, nil
@@ -130,19 +138,20 @@ func loadAAAPlugin(fn string) (string, *AAAProtocol, error) {
 	var protocol AAAProtocol
 	f, e := os.Open(AAAPluginsCfgDir + fn)
 	if e != nil {
-		err := fmt.Errorf("Failed opening plugin config file: %s", e)
+		err := fmt.Errorf("failed opening plugin config file: %s", e)
 		return "", nil, err
 	}
+	defer f.Close()
 	dec := json.NewDecoder(f)
 	e = dec.Decode(&cfg)
 	if e != nil {
-		err := fmt.Errorf("Failed to decode plugin config file: %s", e)
+		err := fmt.Errorf("failed to decode plugin config file: %s", e)
 		return "", nil, err
 	}
 
 	aaaPlugin, e := plugin.Open(AAAPluginsDir + cfg.Name + ".so")
 	if e != nil {
-		err := fmt.Errorf("Could not load plugin: %v", e)
+		err := fmt.Errorf("could not load plugin: %v", e)
 		return "", nil, err
 	}
 
@@ -185,7 +194,7 @@ func LoadAAA() (*AAA, error) {
 					return protocol.Plugin.Setup()
 				})
 				if err != nil {
-					log.Print(fmt.Sprintf("Error setting up plugin %s: %s", name, err))
+					log.Printf("Error setting up plugin %s: %s", name, err)
 					continue
 				}
 				aaa.Protocols[name] = protocol

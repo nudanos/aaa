@@ -11,8 +11,16 @@ GOBUILDDIR := _build
 	dh $@ --buildsystem=golang --with golang --builddirectory=$(GOBUILDDIR)
 
 # NuDanOS: vet every Go package
-override_dh_auto_build: vet
+override_dh_auto_build: vet staticcheck
 	dh_auto_build
 
 vet:
 	cd $(GOBUILDDIR)/src/$(DH_GOPKG) && GOPATH=$(CURDIR)/$(GOBUILDDIR) go vet ./...
+
+# NuDanOS: staticcheck every Go package; distro-build lint reads the result
+# from the build log (distro docs/porting.md)
+staticcheck:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	cd $(GOBUILDDIR)/src/$(DH_GOPKG) && GOPATH=$(CURDIR)/$(GOBUILDDIR) go-staticcheck ./... 2>&1 | sed "s/^/nudanos-staticcheck: /" || true
+	@echo "nudanos-staticcheck: done"
+endif

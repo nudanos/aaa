@@ -4,6 +4,7 @@ Priority: optional
 Maintainer: NuDanOS Maintainers <jon@fernandez.tech>
 Build-Depends: debhelper-compat (= 13),
  dh-golang,
+ go-staticcheck <!nocheck>,
  golang-github-danos-utils-guard-dev,
  golang-github-danos-utils-pathutil-dev,
  golang-go (>= 2:1.4)
